@@ -1,0 +1,21 @@
+{
+    "boosting_type": "dart",
+    "class_weight": null,
+    "colsample_bytree": 0.6884381105595143,
+    "importance_type": "split",
+    "learning_rate": 0.03902812170000275,
+    "max_depth": 4,
+    "min_child_samples": 99,
+    "min_child_weight": 0.2343089300237661,
+    "min_split_gain": 0.0,
+    "n_estimators": 540,
+    "n_jobs": null,
+    "num_leaves": 27,
+    "objective": null,
+    "random_state": 999,
+    "reg_alpha": 0.5560885303342105,
+    "reg_lambda": 2.726613530646656e-05,
+    "subsample": 0.8969088786474554,
+    "subsample_for_bin": 200000,
+    "subsample_freq": 0
+}
