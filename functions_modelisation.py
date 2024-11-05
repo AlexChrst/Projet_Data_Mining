@@ -238,16 +238,16 @@ def optuna_optimization_xgb(X_train, y_train):
 def objective_lgbm(trial, X_train, y_train):
     # grille
     param = {
-        'n_estimators': trial.suggest_int('n_estimators', 50, 1000),
-        'max_depth': trial.suggest_int('max_depth', -1, 15),  # -1 signifie aucune limite
-        'learning_rate': trial.suggest_loguniform('learning_rate', 1e-4, 0.3),
-        'num_leaves': trial.suggest_int('num_leaves', 20, 150),
-        'min_child_samples': trial.suggest_int('min_child_samples', 5, 100),
-        'min_child_weight': trial.suggest_loguniform('min_child_weight', 1e-3, 10.0),
+        'n_estimators': trial.suggest_int('n_estimators', 500, 800),
+        'max_depth': trial.suggest_int('max_depth', 5, 20),  # -1 signifie aucune limite
+        'learning_rate': trial.suggest_loguniform('learning_rate', 1e-4, 0.1),
+        'num_leaves': trial.suggest_int('num_leaves', 10, 40),
+        'min_child_samples': trial.suggest_int('min_child_samples', 100, 150),
+        'min_child_weight': trial.suggest_loguniform('min_child_weight', 1e-3, 1.0),
         'subsample': trial.suggest_float('subsample', 0.5, 1.0),
         'colsample_bytree': trial.suggest_float('colsample_bytree', 0.5, 1.0),
-        'reg_alpha': trial.suggest_loguniform('reg_alpha', 1e-5, 10.0),
-        'reg_lambda': trial.suggest_loguniform('reg_lambda', 1e-5, 10.0),
+        'reg_alpha': trial.suggest_loguniform('reg_alpha', 1e-5, 1.0),
+        'reg_lambda': trial.suggest_loguniform('reg_lambda', 1e-5, 1.0),
         'boosting_type': trial.suggest_categorical('boosting_type', ['gbdt', 'dart', 'goss']),
         'objective': 'binary',
         'random_state': 999

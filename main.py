@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.preprocessing import StandardScaler, OneHotEncoder, FunctionTransformer
 from sklearn.compose import make_column_transformer
 from sklearn.pipeline import make_pipeline
 
@@ -41,15 +41,49 @@ f_eda.afficher_cat_vars_univarie_graph(df, 'Exited', palette=["purple"])
 f_eda.afficher_cat_vars_univarie_tableau(df, 'Exited')
 f_eda.afficher_num_vars_univarie_graph(df, palette=["#3336ff"])
 
+len(df['CustomerId'].unique())
+
+# CustomerId
+moyenne_exited_customerid = df.groupby('CustomerId').mean('Exited')
+moyenne_exited_customerid['Exited'].value_counts()
+
+df_shuffled = df.copy()
+df_shuffled['CustomerId'] = df['CustomerId'].sample(frac=1).reset_index(drop=True)
+moyenne_exited_customerid_shuffled = df_shuffled.groupby('CustomerId').mean('Exited')
+moyenne_exited_customerid_shuffled['Exited'].value_counts()
+# Même distribution entre CustomerId normal et CustomerId mélangé donc pas de lien entre
+# CustomerId et Exited
+
 len(df['Surname'].unique()) # 755 noms différents
+moyenne_exited_surname = df.groupby('Surname').mean('Exited')
+moyenne_exited_surname['Exited'].value_counts()
+
+df_shuffled = df.copy()
+df_shuffled['Surname'] = df['Surname'].sample(frac=1).reset_index(drop=True)
+moyenne_exited_surname_shuffled = df_shuffled.groupby('Surname').mean('Exited')
+moyenne_exited_surname_shuffled['Exited'].value_counts()
+
+fig, axes = plt.subplots(1, 2, figsize=(15,8))
+
+# Histogramme pour 'moyenne_exited_surname'
+axes[0].hist(moyenne_exited_surname['Exited'], bins=20, edgecolor='black')
+axes[0].set_title('Normal')
+axes[1].hist(moyenne_exited_surname_shuffled['Exited'], bins=20, color='red',edgecolor='black')
+axes[1].set_title('Shuffled')
+
+plt.tight_layout()
+plt.show()
+# Même distribution entre Surname normal et Surname mélangé donc pas de lien entre
+# Surname et Exited
+
 
 # Traitement des variables categorielles
-
 vars_cat = df.select_dtypes(include=['object', 'category']).columns
-print(vars_cat) # vars cat sans 'Exited'
+
 
 vars_cat = list(vars_cat)
 vars_cat.remove('Surname')
+print(vars_cat) # vars cat sans 'Exited'
 
 for var in vars_cat:
     print(df[var].nunique(),' modalités issues de la variable', str(var) + " : ", df[var].unique())
@@ -79,12 +113,37 @@ f_eda.afficher_matrice_correlation_num(df)
 # Traitement des valeurs manquantes
 f_pre.afficher_pourcentage_valeurs_manquantes(df)
 
+
 # Feature Engineering / Pipeline
+def create_new_features_scaled(X):
+    X = X.copy()
+    # ** 2
+    X['CreditScore^2'] = X['CreditScore'] ** 2
+    X['Age^2'] = X['Age'] ** 2
+    X['Tenure^2'] = X['Tenure'] ** 2
+    X['Balance^2'] = X['Balance'] ** 2
+    X['EstimatedSalary^2'] = X['EstimatedSalary'] ** 2
+
+    # interactions
+    X['Age_Balance'] = X['Age'] * X['Balance']
+    X['CreditScore_IsActiveMember'] = X['CreditScore'] * X['IsActiveMember']
+    X['NumOfProducts_HasCrCard'] = X['NumOfProducts'] * X['HasCrCard']
+
+    X.drop(columns=['CreditScore', 'Age', 'Tenure', 'Balance', 'EstimatedSalary', 'NumOfProducts', 'IsActiveMember', 'HasCrCard'], inplace=True)
+
+    scaler = StandardScaler()
+    X_scaled = pd.DataFrame(scaler.fit_transform(X), columns=X.columns, index=X.index)
+
+    return X_scaled
+
 preprocessor = make_column_transformer(
     (StandardScaler(), vars_num),
     (OneHotEncoder(drop='first'), vars_cat),
-    remainder='passthrough'  # pour garder les autres colonnes
+    (FunctionTransformer(create_new_features_scaled), ['CreditScore', 'Age', 'Tenure', 'Balance', 'EstimatedSalary', 'NumOfProducts', 
+                                                'IsActiveMember', 'HasCrCard']),
+    remainder='passthrough'
 )
+
 
 # pipeline
 pipeline = make_pipeline(preprocessor)
@@ -93,17 +152,17 @@ pipeline = make_pipeline(preprocessor)
 df.drop(columns = ['CustomerId', 'Surname'], inplace=True)
 df_transformed = pipeline.fit_transform(df)
 encoded_columns = pipeline.named_steps['columntransformer'].named_transformers_['onehotencoder'].get_feature_names_out(vars_cat)
-all_columns = vars_num + list(encoded_columns) + ['Exited']
+new_features = ['CreditScore^2', 'Age^2', 'Tenure^2', 'Balance^2', 'EstimatedSalary^2', 'Age_Balance', 'CreditScore_IsActiveMember', 'NumOfProducts_HasCrCard']
+all_columns = vars_num + list(encoded_columns) + new_features + ['Exited']
 
-df_clean = pd.DataFrame(df_transformed, columns=all_columns)
+df_clean = pd.DataFrame(df_transformed, columns= all_columns)
 
-df_clean.columns
 
 # Traitement de test (test.csv)
 test.drop(columns = ['CustomerId', 'Surname'], inplace=True)
 test_transformed = pipeline.fit_transform(test)
 all_columns.remove('Exited')
-test_clean = pd.DataFrame(test_transformed, columns=all_columns)
+test_clean = pd.DataFrame(test_transformed, columns= all_columns)
 test_clean['Exited'] = pd.NA # variable target vide pour l'instant
 
 test_clean.columns
@@ -124,9 +183,7 @@ features.remove('Exited')
 # LGBM fine-tuned
 best_model = f_m.optuna_optimization_lgbm(df_clean[features], df_clean['Exited'])
 y_pred_proba = best_model.predict_proba(test_clean[features])[:,1]
-
 submission['Exited'] = y_pred_proba
-
 
 date_time_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
