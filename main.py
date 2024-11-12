@@ -14,6 +14,7 @@ import seaborn as sns
 from sklearn.preprocessing import StandardScaler, OneHotEncoder, FunctionTransformer
 from sklearn.compose import make_column_transformer
 from sklearn.pipeline import make_pipeline
+import joblib
 
 import functions_EDA as f_eda
 import functions_pretraitement as f_pre
@@ -80,7 +81,6 @@ plt.show()
 # Traitement des variables categorielles
 vars_cat = df.select_dtypes(include=['object', 'category']).columns
 
-
 vars_cat = list(vars_cat)
 vars_cat.remove('Surname')
 print(vars_cat) # vars cat sans 'Exited'
@@ -111,11 +111,14 @@ f_eda.afficher_matrice_correlation_num(df)
 # Data preprocessing =============================================================================================================
 
 # Traitement des valeurs manquantes
-f_pre.afficher_pourcentage_valeurs_manquantes(df)
+f_pre.afficher_pourcentage_valeurs_manquantes(df) # pas de valeurs manquantes
 
 
 # Feature Engineering / Pipeline
 def create_new_features_scaled(X):
+    """
+    createur de nouvelles features
+    """
     X = X.copy()
     # ** 2
     X['CreditScore^2'] = X['CreditScore'] ** 2
@@ -136,6 +139,7 @@ def create_new_features_scaled(X):
 
     return X_scaled
 
+# pipeline
 preprocessor = make_column_transformer(
     (StandardScaler(), vars_num),
     (OneHotEncoder(drop='first'), vars_cat),
@@ -144,8 +148,6 @@ preprocessor = make_column_transformer(
     remainder='passthrough'
 )
 
-
-# pipeline
 pipeline = make_pipeline(preprocessor)
 
 # Traitement de df (train.csv)
@@ -167,36 +169,45 @@ test_clean['Exited'] = pd.NA # variable target vide pour l'instant
 
 test_clean.columns
 
-# Modelization =============================================================================================================
+# Modelization ======================================================================================================
 
-features = list(df_clean.columns)
+features = list(df_clean.columns) # liste de toutes les features
 features.remove('Exited')
 
-# Random forest / Gridsearch K-fold
+# Random forest / Gridsearch K-fold ===============
 # best_model, best_params = f_m.random_forest_kfold_gridsearch(df_clean, features, 'Exited')
 # y_pred_proba = best_model.predict_proba(test_clean[features])[:,1]
 
-# XGBoost fine-tuned
+# XGBoost fine-tuned / Optuna ===============
 # best_model = f_m.optuna_optimization_xgb(df_clean[features], df_clean['Exited'])
 # y_pred_proba = best_model.predict_proba(test_clean[features])[:,1]
 
-# LGBM fine-tuned
+# LGBM fine-tuned / Optuna ===============
 best_model = f_m.optuna_optimization_lgbm(df_clean[features], df_clean['Exited'])
 y_pred_proba = best_model.predict_proba(test_clean[features])[:,1]
 submission['Exited'] = y_pred_proba
 
 date_time_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+nom_modele = 'LGBM'
 
-# Export des best hyperparameters
+# export des best hyperparamètres
 best_params = best_model.get_params()
-hyperparam_name = f"hyperparameters/hyperparameters_{date_time_str}.txt"
+hyperparam_name = f"artifacts/hyperparameters/{nom_modele}_hyperparameters_{date_time_str}.txt"
 
 with open(hyperparam_name, 'w') as file:
     json.dump(best_params, file, indent=4)
 
-# Export de la soumission
-submission_name = f"submissions/submission_{date_time_str}.csv"
+# export du modèle en .joblib
+model_name = f"artifacts/models/{nom_modele}_model_{date_time_str}.joblib"
+joblib.dump(best_model, model_name)
+
+# export de la soumission
+submission_name = f"submissions/{nom_modele}_submission_{date_time_str}.csv"
 submission.to_csv(submission_name, sep=',', index=False)
+
+print(f"modèle sauvegardé sous: {model_name}")
+print(f"hyperparamètres sauvegardés sous: {hyperparam_name}")
+print(f"soumission sauvegardée sous: {submission_name}")
 
 
 
