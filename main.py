@@ -169,26 +169,35 @@ test_clean['Exited'] = pd.NA # variable target vide pour l'instant
 
 test_clean.columns
 
-# Modelization ======================================================================================================
+# exportation des dataframes preprocessés
+df_clean.to_csv('data/df_clean.csv', sep=';', index=False)
+test_clean.to_csv('data/test_clean.csv', sep=';', index=False)
+
+# Modelization ==============================================================================================================
+
+# Imporation des dataframes déjà preprocessés
+df_clean = pd.read_csv("data/df_clean.csv", sep=';')
+test_clean = pd.read_csv("data/test_clean.csv", sep=';')
 
 features = list(df_clean.columns) # liste de toutes les features
 features.remove('Exited')
 
 # Random forest / Gridsearch K-fold ===============
 # best_model, best_params = f_m.random_forest_kfold_gridsearch(df_clean, features, 'Exited')
-# y_pred_proba = best_model.predict_proba(test_clean[features])[:,1]
 
 # XGBoost fine-tuned / Optuna ===============
-# best_model = f_m.optuna_optimization_xgb(df_clean[features], df_clean['Exited'])
-# y_pred_proba = best_model.predict_proba(test_clean[features])[:,1]
+best_model = f_m.optuna_optimization_xgb(df_clean[features], df_clean['Exited'])
+
 
 # LGBM fine-tuned / Optuna ===============
-best_model = f_m.optuna_optimization_lgbm(df_clean[features], df_clean['Exited'])
+# best_model = f_m.optuna_optimization_lgbm(df_clean[features], df_clean['Exited'])
+
+# prédictions mises dans submission
 y_pred_proba = best_model.predict_proba(test_clean[features])[:,1]
 submission['Exited'] = y_pred_proba
 
 date_time_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-nom_modele = 'LGBM'
+nom_modele = 'XGB'
 
 # export des best hyperparamètres
 best_params = best_model.get_params()
@@ -208,7 +217,3 @@ submission.to_csv(submission_name, sep=',', index=False)
 print(f"modèle sauvegardé sous: {model_name}")
 print(f"hyperparamètres sauvegardés sous: {hyperparam_name}")
 print(f"soumission sauvegardée sous: {submission_name}")
-
-
-
-

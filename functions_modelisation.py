@@ -198,20 +198,20 @@ def tester_modeles(df_norm, selected_variables, target_variable):
 def objective_xgb(trial, X_train, y_train):
     # hyperparametres
     param = {
-        'n_estimators': trial.suggest_int('n_estimators', 50, 300),
-        'max_depth': trial.suggest_int('max_depth', 2, 15),
-        'learning_rate': trial.suggest_loguniform('learning_rate', 1e-4, 0.3),
-        'min_child_weight': trial.suggest_int('min_child_weight', 1, 10),
-        'gamma': trial.suggest_loguniform('gamma', 1e-5, 5.0),
+        'n_estimators': trial.suggest_int('n_estimators', 150, 250),
+        'max_depth': trial.suggest_int('max_depth', 1, 5),
+        'learning_rate': trial.suggest_loguniform('learning_rate', 1e-4, 0.1),
+        'min_child_weight': trial.suggest_int('min_child_weight', 4, 6),
+        'gamma': trial.suggest_loguniform('gamma', 1e-4, 1.0),
         'subsample': trial.suggest_float('subsample', 0.5, 1.0),
         'colsample_bytree': trial.suggest_float('colsample_bytree', 0.5, 1.0),
-        'reg_alpha': trial.suggest_loguniform('reg_alpha', 1e-5, 10.0),
-        'reg_lambda': trial.suggest_loguniform('reg_lambda', 1e-5, 10.0),
+        'reg_alpha': trial.suggest_loguniform('reg_alpha', 1e-5, 0.1),
+        'reg_lambda': trial.suggest_loguniform('reg_lambda', 0.1, 5.0),
     }
 
-    xgb_model = XGBClassifier(**param, random_state=999, use_label_encoder=False, eval_metric='logloss')
+    xgb_model = XGBClassifier(**param, random_state=1234, use_label_encoder=False, eval_metric='logloss')
 
-    skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=999)
+    skf = StratifiedKFold(n_splits=10, shuffle=True, random_state=999)
 
     auc_mean = cross_val_score(xgb_model, X_train, y_train, n_jobs=-1, cv=skf, scoring='roc_auc').mean()
 
@@ -236,27 +236,27 @@ def optuna_optimization_xgb(X_train, y_train):
 
 
 def objective_lgbm(trial, X_train, y_train):
-    # grille
+    # intervalles de recherche
     param = {
-        'n_estimators': trial.suggest_int('n_estimators', 400, 600),
-        'max_depth': trial.suggest_int('max_depth', 3, 8),  # -1 signifie aucune limite
-        'learning_rate': trial.suggest_loguniform('learning_rate', 1e-4, 0.1),
-        'num_leaves': trial.suggest_int('num_leaves', 5, 15),
+        'n_estimators': trial.suggest_int('n_estimators', 590, 620),
+        'max_depth': trial.suggest_int('max_depth', 4, 7),  # -1 signifie aucune limite
+        'learning_rate': trial.suggest_loguniform('learning_rate', 1e-3, 0.05),
+        'num_leaves': trial.suggest_int('num_leaves', 7, 12),
         'min_child_samples': trial.suggest_int('min_child_samples', 120, 160),
         'min_child_weight': trial.suggest_loguniform('min_child_weight', 1e-3, 0.1),
         'subsample': trial.suggest_float('subsample', 0.8, 1.0),
         'colsample_bytree': trial.suggest_float('colsample_bytree', 0.8, 1.0),
-        'reg_alpha': trial.suggest_loguniform('reg_alpha', 1e-5, 1.0),
-        'reg_lambda': trial.suggest_loguniform('reg_lambda', 1e-5, 1.0),
-        'boosting_type': trial.suggest_categorical('boosting_type', ['gbdt', 'dart']),
+        'reg_alpha': trial.suggest_loguniform('reg_alpha', 1e-6, 0.01),
+        'reg_lambda': trial.suggest_loguniform('reg_lambda', 1e-7,1e-4),
+        'boosting_type': trial.suggest_categorical('boosting_type', ['gbdt']),
         'objective': 'binary',
-        'random_state': 2024
+        'random_state': 111
     }
 
     lgbm_model = LGBMClassifier(**param)
 
     # StratifiedKFold car 80 % /20 %
-    skf = StratifiedKFold(n_splits=10, shuffle=True, random_state=999)
+    skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=99)
 
     # auc moyen pour evaluer la perf du modèle testé
     auc_mean = cross_val_score(lgbm_model, X_train, y_train, n_jobs=-1, cv=skf, scoring='roc_auc').mean()
