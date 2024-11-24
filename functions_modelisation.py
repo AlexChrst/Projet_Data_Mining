@@ -14,6 +14,7 @@ from sklearn.cluster import KMeans
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.metrics import classification_report, accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
+from sklearn.neighbors import KNeighborsClassifier
 from xgboost import XGBClassifier
 from sklearn.metrics import roc_curve, auc
 from sklearn.model_selection import StratifiedKFold, cross_val_score
@@ -374,3 +375,32 @@ def plot_courbe_roc(y, y_pred_proba, title:str, color:str):
     plt.legend(loc='lower right')
     plt.grid(True)
     plt.show()
+
+def objective_knn(trial, X_train, y_train):
+    # hyperparametres
+    param = {
+        'n_neighbors': trial.suggest_int('n_neighbors', 3, 10),
+        'weights': trial.suggest_categorical('weights', ['uniform', 'distance']),
+        'p': trial.suggest_int('p', 1, 2)
+    }
+
+    knn_model = KNeighborsClassifier(**param)
+
+    skf = StratifiedKFold(n_splits=10, shuffle=True, random_state=999)
+
+    auc_mean = cross_val_score(knn_model, X_train, y_train, n_jobs=-1, cv=skf, scoring='roc_auc').mean()
+
+    return auc_mean
+    
+def optuna_optimization_knn(X_train, y_train):
+
+    study = optuna.create_study(direction='maximize')
+    study.optimize(lambda trial: objective_knn(trial, X_train, y_train), n_trials=100)
+
+    best_params = study.best_params
+    print('Best hyperparameters:', best_params)
+
+    best_knn_model = KNeighborsClassifier(**best_params)
+    best_knn_model.fit(X_train, y_train)
+    
+    return best_knn_model

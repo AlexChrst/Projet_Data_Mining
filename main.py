@@ -186,7 +186,10 @@ features.remove('Exited')
 # best_model, best_params = f_m.random_forest_kfold_gridsearch(df_clean, features, 'Exited')
 
 # XGBoost fine-tuned / Optuna ===============
-best_model = f_m.optuna_optimization_xgb(df_clean[features], df_clean['Exited'])
+# best_model = f_m.optuna_optimization_xgb(df_clean[features], df_clean['Exited'])
+
+# KNN fine-tuned / Optuna ===============
+best_model = f_m.optuna_optimization_knn(df_clean[features], df_clean['Exited'])  
 
 
 # LGBM fine-tuned / Optuna ===============
@@ -197,7 +200,7 @@ y_pred_proba = best_model.predict_proba(test_clean[features])[:,1]
 submission['Exited'] = y_pred_proba
 
 date_time_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-nom_modele = 'XGB'
+nom_modele = 'KNN'
 
 # export des best hyperparamètres
 best_params = best_model.get_params()
