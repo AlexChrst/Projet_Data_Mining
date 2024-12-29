@@ -15,6 +15,7 @@ from sklearn.preprocessing import StandardScaler, OneHotEncoder, FunctionTransfo
 from sklearn.compose import make_column_transformer
 from sklearn.pipeline import make_pipeline
 import joblib
+import shap
 
 import functions_EDA as f_eda
 import functions_pretraitement as f_pre
@@ -217,3 +218,11 @@ submission.to_csv(submission_name, sep=',', index=False)
 print(f"modèle sauvegardé sous: {model_name}")
 print(f"hyperparamètres sauvegardés sous: {hyperparam_name}")
 print(f"soumission sauvegardée sous: {submission_name}")
+
+
+
+
+explainer = shap.TreeExplainer(best_model)
+shap_values = explainer(test_clean[features])
+shap.summary_plot(shap_values, test_clean[features])
+shap.plots.bar(shap_values)
