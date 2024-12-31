@@ -20,6 +20,7 @@ from sklearn.model_selection import StratifiedKFold, cross_val_score
 import optuna
 import xgboost as xgb
 from lightgbm import LGBMClassifier
+from catboost import CatBoostClassifier
 
 
 
@@ -238,19 +239,23 @@ def optuna_optimization_xgb(X_train, y_train):
 def objective_lgbm(trial, X_train, y_train):
     # intervalles de recherche
     param = {
-        'n_estimators': trial.suggest_int('n_estimators', 590, 620),
-        'max_depth': trial.suggest_int('max_depth', 4, 7),  # -1 signifie aucune limite
-        'learning_rate': trial.suggest_loguniform('learning_rate', 1e-3, 0.05),
-        'num_leaves': trial.suggest_int('num_leaves', 7, 12),
-        'min_child_samples': trial.suggest_int('min_child_samples', 120, 160),
-        'min_child_weight': trial.suggest_loguniform('min_child_weight', 1e-3, 0.1),
-        'subsample': trial.suggest_float('subsample', 0.8, 1.0),
-        'colsample_bytree': trial.suggest_float('colsample_bytree', 0.8, 1.0),
-        'reg_alpha': trial.suggest_loguniform('reg_alpha', 1e-6, 0.01),
-        'reg_lambda': trial.suggest_loguniform('reg_lambda', 1e-7,1e-4),
-        'boosting_type': trial.suggest_categorical('boosting_type', ['gbdt']),
         'objective': 'binary',
-        'random_state': 111
+        'metric': 'auc',
+        'is_unbalance': 'true',
+        'boosting': 'gbdt',
+        'num_leaves': trial.suggest_int('num_leaves', 20, 150),
+        'feature_fraction': trial.suggest_float('feature_fraction', 0.4, 1.0),
+        'bagging_fraction': trial.suggest_float('bagging_fraction', 0.4, 1.0),
+        'bagging_freq': trial.suggest_int('bagging_freq', 1, 50),
+        'learning_rate': trial.suggest_float('learning_rate', 1e-3, 1e-1, log=True),
+        'lambda_l1': trial.suggest_float('lambda_l1', 1e-8, 10.0, log=True),
+        'lambda_l2': trial.suggest_float('lambda_l2', 1e-8, 10.0, log=True),
+        'min_child_samples': trial.suggest_int('min_child_samples', 5, 100),
+        'max_depth': trial.suggest_int('max_depth', 3, 15),
+        'verbose': 0,
+        'max_bin': trial.suggest_int('max_bin', 63, 255),  # Par défaut 255
+        'path_smooth': trial.suggest_float('path_smooth', 0.0, 1.0)
+
     }
 
     lgbm_model = LGBMClassifier(**param)
@@ -275,6 +280,104 @@ def optuna_optimization_lgbm(X_train, y_train):
     best_lgbm_model.fit(X_train, y_train)
     
     return best_lgbm_model
+
+
+
+def objective_catboost(trial, X_train, y_train):
+    # Hyperparamètres à optimiser
+    # param = {
+    #     'iterations': trial.suggest_int('iterations', 200, 1000),
+    #     'depth': trial.suggest_int('depth', 3, 10),
+    #     'learning_rate': trial.suggest_loguniform('learning_rate', 1e-4, 0.1),
+    #     'l2_leaf_reg': trial.suggest_float('l2_leaf_reg', 1, 10),
+    #     'objective': trial.suggest_categorical('objective', ['Logloss', 'CrossEntropy']),
+    #     'boosting_type': trial.suggest_categorical("boosting_type", ["Ordered", "Plain"]),
+    #     'border_count': trial.suggest_int('border_count', 32, 255),
+    #     'random_strength': trial.suggest_float('random_strength', 0.0, 10.0),
+    #     'allow_writing_files': False,  
+    #     'verbose': False,
+    #     'task_type': 'CPU',  
+    #     #"used_ram_limit": "3gb",
+    # }
+
+    # # Gestion conditionnelle du bootstrap_type et bagging_temperature
+    # bootstrap_type = trial.suggest_categorical("bootstrap_type", ["Bayesian", "Bernoulli", "MVS"])
+    # param['bootstrap_type'] = bootstrap_type
+
+    # if bootstrap_type == "Bayesian":
+    #     param['bagging_temperature'] = trial.suggest_float('bagging_temperature', 0.0, 1.0)
+    
+    # Choisir le boosting_type
+    boosting_type = trial.suggest_categorical('boosting_type', ['Ordered', 'Plain'])
+
+    # Contrainte sur grow_policy en fonction du boosting_type
+    if boosting_type == 'Ordered':
+        grow_policy = 'SymmetricTree'  # Boosting Ordered nécessite des arbres symétriques
+    else:
+        grow_policy = trial.suggest_categorical('grow_policy', ['SymmetricTree', 'Depthwise', 'Lossguide'])
+
+    # Contrainte sur sampling_frequency en fonction de grow_policy
+    if grow_policy == 'Lossguide':
+        sampling_frequency = 'PerTree'  # PerTreeLevel n'est pas compatible avec Lossguide
+    else:
+        sampling_frequency = trial.suggest_categorical('sampling_frequency', ['PerTree', 'PerTreeLevel'])
+
+    # Définir les autres hyperparamètres
+    param = {
+        'iterations': trial.suggest_int('iterations', 200, 1000),
+        'depth': trial.suggest_int('depth', 3, 10),
+        'learning_rate': trial.suggest_loguniform('learning_rate', 1e-4, 0.1),
+        'l2_leaf_reg': trial.suggest_loguniform('l2_leaf_reg', 0.1, 100),
+        'objective': 'Logloss',  # Assurez-vous de ne pas utiliser CrossEntropy avec class_weights
+        'boosting_type': boosting_type,
+        'grow_policy': grow_policy,
+        'sampling_frequency': sampling_frequency,
+        'bootstrap_type': trial.suggest_categorical('bootstrap_type', ['Bayesian', 'Bernoulli', 'MVS']),
+        'random_strength': trial.suggest_float('random_strength', 0.0, 10.0),
+        'max_bin': trial.suggest_int('max_bin', 32, 255),
+        'min_data_in_leaf': trial.suggest_int('min_data_in_leaf', 1, 50),
+        'auto_class_weights': 'SqrtBalanced',  # Gestion du déséquilibre
+        'allow_writing_files': False,
+        'verbose': False,
+        'task_type': 'CPU',
+        'used_ram_limit': '3gb'
+    }
+
+    # Ajouter des paramètres conditionnels pour bootstrap_type
+    if param['bootstrap_type'] == 'Bayesian':
+        param['bagging_temperature'] = trial.suggest_float('bagging_temperature', 0.0, 5.0)
+    elif param['bootstrap_type'] in ['Bernoulli', 'MVS']:
+        param['subsample'] = trial.suggest_float('subsample', 0.5, 1.0)
+
+    # Création du modèle
+    catboost_model = CatBoostClassifier(**param)
+
+    # Validation croisée stratifiée
+    skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=999)
+
+    # Calcul de l'AUC moyen pour évaluer la performance
+    auc_mean = cross_val_score(catboost_model, X_train, y_train, cv=skf, scoring='roc_auc', n_jobs=-1).mean()
+
+    return auc_mean
+
+def optuna_optimization_catboost(X_train, y_train):
+    # Étude d'optimisation Optuna
+    study = optuna.create_study(direction='maximize')
+    study.optimize(lambda trial: objective_catboost(trial, X_train, y_train), n_trials=100)
+
+    # Affichage des meilleurs hyperparamètres
+    best_params = study.best_params
+    print('Best hyperparameters:', best_params)
+
+    # Entraînement final avec les meilleurs hyperparamètres
+    best_catboost_model = CatBoostClassifier(**best_params, random_state=999)
+    best_catboost_model.fit(X_train, y_train)
+    
+    return best_catboost_model
+
+
+
+
 
 # Fine-tuning d'un Random Forest
 def random_forest_kfold_gridsearch(df, var_x, var_y, k_folds=5):

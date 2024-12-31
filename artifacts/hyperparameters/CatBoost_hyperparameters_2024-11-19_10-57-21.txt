@@ -1,0 +1,12 @@
+{
+    "iterations": 918,
+    "learning_rate": 0.00802063912667004,
+    "depth": 6,
+    "l2_leaf_reg": 2.6980886557568686,
+    "border_count": 126,
+    "random_strength": 0.43447534100780094,
+    "boosting_type": "Ordered",
+    "bootstrap_type": "Bernoulli",
+    "random_state": 999,
+    "objective": "Logloss"
+}
